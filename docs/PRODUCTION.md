@@ -2,6 +2,20 @@
 
 This document describes work still required, not capabilities currently delivered.
 
+## Web conversion
+
+The default development workflow is now the plain JavaScript browser app in `web/`; Xcode is not required to run it. The following native implementation notes remain relevant to the retained iOS reference, but browser delivery needs different platform integrations:
+
+- Replace localStorage and whole-workspace audit snapshots with versioned transactional IndexedDB storage, bounded entity audit diffs, attachment blobs and tested migrations. Browser quota/eviction, private browsing and simultaneous-tab writes must be covered. The current demo checks stale revisions but is not a multi-tab transactional database.
+- Implement a service worker and offline shell caching before claiming reload/launch works without the server. Locally loaded pages can save while offline, but cold offline startup is not implemented.
+- Use browser-compatible OIDC Authorization Code with PKCE and a reviewed token/session architecture. Do not place production credentials in localStorage. Enforce all permissions and tenant ownership on a real server.
+- Implement change feed pulls, typed mutation delivery, acknowledgements, attachment storage and conflict recovery. Static hosting alone does not create a backend.
+- Browser Web Push requires HTTPS, a service worker, permission and a deployed subscription/push service. iOS browser background behavior differs from a native app; do not promise guaranteed background delivery.
+- Provide browser backup restore/recovery, native-to-web data migration, service/site photos, full checklist-template inheritance, a geographic dispatch map, expanded reports and outstanding product requirements listed below.
+- Validate Safari on actual iPhones/iPads, Chrome/Firefox desktop, keyboard focus, screen readers, zoom, touch sizes, print pagination, interrupted saves, quota errors and contract totals before operational use.
+
+The web app uses local development identities and sample data. It is not a production record system or a substitute for deployed multi-tenant services.
+
 ## Backend and tenancy
 
 Implement an authenticated organization-scoped relational backend. Keep separate tables for user membership, employee, crew, crew membership, customer, property, property service, pricing rule/tier, checklist template/item, storm, assignment/route order, visit, visit service snapshot, checklist response, material usage, photo metadata, issue, billing adjustment, invoice-prep record and append-only audit event. Every child foreign key must belong to the same organization; UUID possession must never confer access.

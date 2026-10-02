@@ -1,71 +1,66 @@
 # Snow Ops
 
-Native SwiftUI iPhone/iPad snow-removal operations app, targeting **iOS 26** and **Xcode 26**. The source uses native tab bars, navigation stacks, forms, sheets, MapKit, SF Symbols, semantic colors and Liquid Glass map controls. No web view or external app dependencies.
+Snow-removal operations in a browser, built with **plain HTML, CSS, and JavaScript**. No framework, build step, Xcode, Apple signing, or external runtime dependencies are required. The native iOS implementation is retained as a reference; the web app is the default development workflow.
 
-**Status: substantial local development implementation, not production-ready.** Secure sign-in, a deployed multi-tenant backend, bidirectional automatic synchronization, background transfer and APNs delivery are not connected. The app says this explicitly and never labels queued work “synced.” This project has not been compiled or run on an Apple device because the authoring environment is Windows without Swift or Xcode. Do not use it as your only service record system until the release checks below pass.
+## Run locally
 
-## Open on a Mac
+Install Node.js 22 or newer. In Terminal:
 
-1. Open `SnowOps.xcodeproj` in Xcode 26 or newer. Select the `SnowOps` scheme.
-2. Select your development team in Signing & Capabilities and change `com.snowops.app` to your bundle identifier.
-3. Select an iOS 26 simulator or a connected device and Run.
-4. In More → Settings & development access, select a sample administrator, manager or field employee to test each interface. This identity switch is development-only, not authentication.
+```sh
+cd /Users/cameron/Documents/snowops
+npm start
+```
 
-The Xcode project is checked in. After adding Swift files, regenerate it with `node scripts/generate-project.mjs` (Node 22 or newer). An equivalent `project.yml` is included for teams already using XcodeGen; neither generator is required to open the checked-in project.
+Open **http://localhost:3000** in your browser. Leave Terminal running; press Control-C to stop. On another machine use that machine’s repository path. `PORT=3001 npm start` uses a different port. Use the same address and port each time: browser data is specific to a site origin.
+
+You can host the contents of `web/` on any static HTTPS host. Hosting makes the interface accessible; it does not add shared data or authentication. Plain HTTP on a remote machine is unsupported because the app uses secure-context browser APIs. Localhost is supported for development.
 
 ## Included workflows
 
-- Administrator dashboard, seven-step storm setup, status transitions and progress.
-- Separate customers/properties, customer editing and archiving, property setup/duplication, custom service names, rates, triggers and snowfall tiers.
-- Crews, equipment descriptions, employee crew assignment and configurable manager permissions.
-- Dispatch by crew, route reordering, reassignment, additional visits and documented stop exceptions.
-- Field home, assigned route, status map, Apple Maps directions, visit start/timer, typed checklists, services, quantities, materials, library photo attachment, notes and issue reporting.
-- Locally saved field edits, duplicate-start protection, required-work checks and authorized completion overrides.
-- Completed visit history, audited corrections/cancellation with required reasons and retained original snapshots.
-- Final snowfall recalculation, property billing breakdowns, independent calculated/final amounts, preserved overrides, review flags and finalization validation.
-- Storm summaries, invoice-prep filters, copy/share, CSV/PDF export, and external-invoice “entered” tracking. Exports summarize one property/storm per row; the app creates no invoices.
-- Search across names, addresses, customers, storms, crews, employees and visit notes.
-- Ten realistic sample properties, three crews, five development identities, one active February 6 sample storm, tier and per-push pricing, and three completed visits.
+- Responsive administrator overview and field home with crew-scoped routes.
+- Storm preparation, property selection, crew assignment, activation, wrap-up, review and finalization.
+- Customers with contacts and archive status; properties with instructions, hazards, custom services, snowfall tiers, typed checklists and independent duplication.
+- Crew/equipment editing, employee crew assignment and manager permissions.
+- Dispatch reordering, reassignment, additional visits and reasoned stop exceptions.
+- Visits with duplicate-start protection, original pricing/checklist snapshots, materials, notes, JPEG/PNG/WebP photo attachments, required-work validation and authorized overrides.
+- Local visit history, completed-record corrections/cancellation with reasons, before/after audit snapshots (photo metadata rather than duplicated image bytes) and billing invalidation.
+- Exact decimal money calculation, snowfall recalculation, separate final overrides, billing review and finalization blockers.
+- Invoice preparation filters, CSV download, browser Print / Save PDF and external-invoice entered tracking. No actual invoices are created.
+- Search in customers, properties, routes and visit history; JSON workspace backup downloads and recovery downloads when saved data cannot be opened.
 
-## Architecture
+The development identity selector previews roles; **it is not authentication**. Client permission checks keep the demo workflows consistent, but a deployed backend must enforce security.
 
-`Sources/SnowOpsCore` is a Foundation-only Swift package: Codable value models, decimal pricing, validation, seed fixtures and safe CSV encoding. `SnowOps` separates feature views, shared UI, the observable operations store, persistence, transport and export services. `SnowOpsTests` exercises offline mutations and permission checks; `Tests/SnowOpsCoreTests` exercises domain behavior.
+## Local records
 
-Entities use stable UUID foreign keys rather than copying customer/property objects into visits. A visit intentionally snapshots service pricing and checklist definitions at arrival, so later configuration changes cannot silently rewrite historical work. Route and crew relationships are represented by storm assignment ordering and employee IDs; there is no separate redundant route entity. Billing records hold final overrides and entered status alongside calculations.
+A versioned JSON envelope in browser localStorage commits records, audit snapshots and pending changes in one write. Memory updates only after that write succeeds. Invalid/unsupported saved data is preserved and exposes a recovery download. Stale-tab writes are rejected when a changed revision is detected; simultaneous cross-tab edits are not supported. Use one editing tab per workspace.
 
-### Local persistence
+Photos are saved in that same envelope (input limit 10 MB, resized to 1280 pixels with a bounded JPEG size). Browser storage quotas are small, full snapshots grow with each edit, and there is no production attachment store. If a save fails, the app displays the error and leaves the previously saved workspace intact. Download backups regularly, especially before clearing site data. Private browsing and browser cleanup can remove local records. Pending changes are never labeled synced and are never removed in this demo.
 
-The local repository writes a versioned Codable envelope to Application Support with an atomic replacement and file protection until first unlock. Domain changes, audit history and a durable outbox commit together. Memory only changes after a successful write. A corrupt or unsupported file shows a recovery error and is preserved; the app never deletes it or reseeds over it. Photos live in protected Application Support files and their references live in visits. Unreferenced photo files can remain after a failed reference save; cleanup must not run before recovery has been assessed.
+Native iOS files are **not automatically imported** into the browser. Preserve existing native records until an explicit migration is built and verified. The web backup format is not a Swift Codable import format. Backup restoration UI is not implemented.
 
-This is an appropriate replaceable local persistence boundary for a small development dataset, not a production-scale relational store. Audit snapshots exclude the audit array to avoid recursive growth. Full workspace snapshots and synchronous writes should be replaced with transactional row persistence, entity-scoped audit diffs and a migration strategy before large-scale use. There is no at-rest application-level encryption beyond iOS file protection and no implemented backup/restore UI.
+Money inputs use decimal strings, with up to six fractional places; calculations use BigInt fractions and cent rounding. Tier bounds are lower-inclusive and upper-exclusive. Missing/overlapping tiers and manual pricing block calculation. Changed billing retains overrides but requires another review.
 
-### Synchronization and authentication boundary
-
-`SyncTransport` provides a replaceable HTTPS upload boundary with authorization headers, idempotency keys and matching commit receipts. It is intentionally not scheduled or wired to a server in the development UI. **A transport interface is not a finished sync engine.** Outbox entries are never removed here. See `docs/PRODUCTION.md` for the server, auth, conflict, background and attachment requirements. Production roles must be derived from verified server identities; the local role selector cannot enforce cross-device security.
-
-### Pricing rules
-
-- All money uses `Decimal`, rounded to cents with `.plain`.
-- Custom tiers are half-open `[lower, upper)`; a nil upper bound is open-ended. At exactly 6 inches, the tier beginning at 6 applies.
-- Gaps may be configured, but a missing matching tier blocks calculation instead of silently charging zero. Overlaps and negative rates are rejected.
-- Tier pricing is applied per completed, performed, billable visit. Each service can use a different pricing method. Per-inch multiplies snowfall by the recorded quantity; hourly uses recorded arrival/departure duration.
-- An open tier can add an incremental rate above its lower boundary.
-- Seasonal services contribute zero event billing. Manual services block calculation until an authorized correction supplies an explicit method/rate.
-- Administrative overrides remain separate from calculations. Changing snowfall updates calculated values and flags affected totals without erasing overrides.
-- Correcting completed work invalidates review. Stale totals cannot be accepted or finalized without recalculation.
-- Finalization locks storm/service/billing edits. Marking an invoice-prep record entered remains allowed after finalization.
-
-## Verification
-
-On a Mac with Xcode 26:
+## Checks
 
 ```sh
-swift test
-xcodebuild -project SnowOps.xcodeproj -scheme SnowOps -destination 'platform=iOS Simulator,name=iPhone 17' test
+npm test
+npm run check
 ```
 
-Choose an installed simulator name if iPhone 17 is unavailable. On Windows the available check is `node scripts/check-project.mjs`; it checks source inventory and project references, **not Swift compilation or behavior**.
+The first runs Node’s built-in domain tests. The second checks JavaScript syntax and retained native source/project references. Neither requires dependencies.
 
-Tests cover tier boundaries, multiple visits, additional-inch rates, duration billing, cancellation, missing/overlapping tiers, manual pricing, snapshots, required responses/photos, finalization blockers, CSV formula injection, serialization, durable offline visits, duplicate starts, role restrictions, failed local writes and override-preserving recalculation. Test sources are provided; XCTest execution is still unverified.
+Optional browser acceptance (development dependency only):
 
-See `docs/WORKFLOW-ACCEPTANCE.md` for the requested end-to-end device acceptance script and `docs/PRODUCTION.md` for the remaining release work.
+```sh
+npm install --no-save --package-lock=false playwright
+npx playwright install chromium
+node scripts/test-web-browser.mjs
+```
+
+Alternatively, point `CHROMIUM_PATH` at an installed Chromium/Chrome executable. The smoke script starts a browser against the running server and covers real controls, persistence, crew permissions, billing and mobile layout. `SNOWOPS_URL` changes the server address. See `docs/WEB-ACCEPTANCE.md` for manual checks.
+
+## Remaining production work
+
+See `docs/PRODUCTION.md`. Secure sign-in, multi-tenant backend storage, automatic bidirectional sync, photo uploads, cross-device dispatch and push notifications require deployed services. Browser-based offline shell caching, backup restoration, large-dataset storage and automatic migrations remain unfinished. Opening this local app does not prove production readiness.
+
+The retained Swift project and its Xcode-specific requirements are described in `docs/NATIVE-IOS.md`.

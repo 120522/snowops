@@ -1,0 +1,13 @@
+{
+  "name": "snowops-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve-web.mjs",
+    "test": "node --test tests/web/*.test.mjs",
+    "check": "node --check web/core.js && node --check web/app.js && node --check scripts/serve-web.mjs && node scripts/check-project.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
