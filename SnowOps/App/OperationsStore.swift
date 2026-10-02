@@ -12,14 +12,18 @@ import SnowOpsCore
     var activeStorm: Storm? { state.storms.first { $0.status == .active || $0.status == .wrappingUp } }
     var isAdminInterface: Bool { actor.role != .field }
     init(repository: LocalRepository) throws {
-        self.repository = repository
-        if let saved = try repository.load() { state = saved.workspace; outbox = saved.outbox }
+        let workspace: Workspace
+        let pending: [PendingMutation]
+        if let saved = try repository.load() { workspace = saved.workspace; pending = saved.outbox }
         else {
-            state = Seed.workspace(); outbox = []
-            try repository.save(LocalEnvelope(workspace: state))
+            workspace = Seed.workspace(); pending = []
+            try repository.save(LocalEnvelope(workspace: workspace))
         }
-        guard let first = state.employees.first else { throw DomainError.invalid("The saved workspace has no employee identity. Its data has been preserved.") }
-        actorID = first.id
+        guard let first = workspace.employees.first else { throw DomainError.invalid("The saved workspace has no employee identity. Its data has been preserved.") }
+        self.repository = repository
+        self.state = workspace
+        self.outbox = pending
+        self.actorID = first.id
     }
     func property(_ id: UUID) -> Property? { state.properties.first { $0.id == id } }
     func storm(_ id: UUID) -> Storm? { state.storms.first { $0.id == id } }

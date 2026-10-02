@@ -8,6 +8,40 @@ import SnowOpsCore
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return try OperationsStore(repository: LocalRepository(directory: directory))
     }
+    func testInitializationLoadsWorkspaceIdentityAndOutboxWithoutRewritingFile() throws {
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let repository = LocalRepository(directory: directory)
+        var workspace = Seed.workspace()
+        workspace.employees.reverse()
+        let mutation = PendingMutation(auditID: UUID())
+        try repository.save(LocalEnvelope(workspace: workspace, outbox: [mutation]))
+        let originalData = try Data(contentsOf: repository.file)
+
+        let store = try OperationsStore(repository: repository)
+
+        XCTAssertEqual(store.actorID, workspace.employees.first?.id)
+        XCTAssertEqual(store.state.employees.map(\.id), workspace.employees.map(\.id))
+        XCTAssertEqual(store.outbox.map(\.id), [mutation.id])
+        XCTAssertEqual(try Data(contentsOf: repository.file), originalData)
+    }
+    func testInitializationRejectsMissingIdentityAndPreservesSavedData() throws {
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let repository = LocalRepository(directory: directory)
+        var workspace = Seed.workspace()
+        workspace.employees = []
+        try repository.save(LocalEnvelope(workspace: workspace, outbox: [PendingMutation(auditID: UUID())]))
+        let originalData = try Data(contentsOf: repository.file)
+
+        do {
+            _ = try OperationsStore(repository: repository)
+            XCTFail("A workspace without an employee identity must be rejected")
+        } catch {
+            XCTAssertEqual(error as? DomainError, .invalid("The saved workspace has no employee identity. Its data has been preserved."))
+        }
+        XCTAssertEqual(try Data(contentsOf: repository.file), originalData)
+    }
     func testOfflineVisitIsDurableAcrossRestart() throws {
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = try store()

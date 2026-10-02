@@ -25,7 +25,7 @@ import SnowOpsCore
                 let customer = state.customers.first { $0.id == property.customerID }?.name ?? "Customer"
                 let text = "\(customer)\n\(property.name)\n\(storm.name) · \(storm.start.formatted(date: .abbreviated, time: .omitted))\nCalculated: \(record.calculated.currency)    Final: \(record.final.currency)\n\(record.reason)\n\(record.entered ? "Entered" : record.needsReview || storm.status != .finalized ? "Needs review" : "Ready")"
                 let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.black]
-                let height = (text as NSString).boundingRect(with: CGSize(width: 528, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin], attributes: attributes, context: nil).height + 24
+                let height = (text as NSString).boundingRect(with: CGSize(width: 528, height: CGFloat.greatestFiniteMagnitude), options: [.usesLineFragmentOrigin], attributes: attributes, context: nil).height + 24
                 if y + height > 750 { page() }
                 (text as NSString).draw(in: CGRect(x: 42, y: y, width: 528, height: height), withAttributes: attributes)
                 y += height
